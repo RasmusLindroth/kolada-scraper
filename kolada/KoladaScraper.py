@@ -73,7 +73,7 @@ class KoladaScraper(BaseScraper):
 
         if "municipality" in query:
             next_url += "/municipality/{}".format(",".join(query["municipality"]))
-        elif "period" in query:
+        if "period" in query:
             next_url += "/year/{}".format(",".join(query["period"]))
 
         while next_url:
