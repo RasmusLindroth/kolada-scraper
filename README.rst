@@ -27,10 +27,10 @@ Example usage
     'municipality': towns[:5],
   })
 
-  # ...or by area_group
-  areas = [x.value for x in dataset.dimensions['area_group'].allowed_values]
+  # ...or by municipality_groups
+  groups = [x.value for x in dataset.dimensions['municipality_groups'].allowed_values]
   data = dataset.fetch({
-    'area_group': areas[:5],
+    'municipality_groups': groups[:5],
   })
 
 
@@ -38,7 +38,7 @@ Example usage
   data = dataset.fetch({
     'period': [2016, 2015],
     'municipality': towns[:5],
-    'area_group': areas[:5],
+    'municipality_groups': groups[:5],
   })
 
   # And then do something with the results.

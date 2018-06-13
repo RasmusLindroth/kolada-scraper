@@ -13,8 +13,8 @@ class KoladaScraper(BaseScraper):
     def _init(self):
         """Inits variables for class"""
         self.base_url = 'http://api.kolada.se/v2/'
-        self.areas = None
-        self.areaGroups = None
+        self._municipalities = None
+        self._municipality_groups = None
 
     def _fetch_itemslist(self, item):
         """Yield a collection or dataset at
@@ -26,7 +26,7 @@ class KoladaScraper(BaseScraper):
 
     def _fetch_dimensions(self, dataset):
         """Yield the available dimensions in <dataset>."""
-        yield Dimension('area_group', label='area group')
+        yield Dimension('municipality_groups', label='municipality groups')
         yield Dimension('municipality', label='municipality')
         yield Dimension('kpi', label='indicator')
         yield Dimension('kpi_label', label='indicator name')
@@ -34,10 +34,10 @@ class KoladaScraper(BaseScraper):
         yield Dimension('period', label='period')
         yield Dimension('status', label='status')
     
-    def _getAllowedAreas(self, type):
-        """Caches areas and returns them by type (`K`|`L`)"""
-        if self.areas == None:
-            self.areas = {
+    def _get_allowed_municipalities(self, type):
+        """Caches municipalities and returns them by type (`K`|`L`)"""
+        if self._municipalities == None:
+            self._municipalities = {
                 'K': [],
                 'L': []
             }
@@ -45,15 +45,15 @@ class KoladaScraper(BaseScraper):
             for row in data['values']:
                 r = (row['id'], row['title'])
                 if row['type'] in ('K','L'):
-                    self.areas[row['type']].append(r)
-        if type in self.areas:
-            return self.areas[type]
+                    self._municipalities[row['type']].append(r)
+        if type in self._municipalities:
+            return self._municipalities[type]
         return []
     
-    def _getAllowedAreaGroups(self, type):
-        """Caches area groups and returns them by type (`K`|`L`)"""
-        if self.areaGroups == None:
-            self.areaGroups = {
+    def _get_allowed_municipality_groups(self, type):
+        """Caches municipality groups and returns them by type (`K`|`L`)"""
+        if self._municipality_groups == None:
+            self._municipality_groups = {
                 'K': [],
                 'L': []
             }
@@ -65,30 +65,34 @@ class KoladaScraper(BaseScraper):
             for row in data['values']:
                 r = (row['id'], row['title'])
                 if municipalityReg.search(row['title']):
-                    self.areaGroups['K'].append(r)
+                    self._municipality_groups['K'].append(r)
                 elif regionalReg.search(row['title']):
-                    self.areaGroups['L'].append(r)
-        if type in self.areaGroups:
-            return self.areaGroups[type]
+                    self._municipality_groups['L'].append(r)
+        if type in self._municipality_groups:
+            return self._municipality_groups[type]
         return []
 
 
     def _fetch_allowed_values(self, dimension):
         """Yield the allowed values for <dimension>."""
         if dimension.id in 'municipality':
-            areas = self._getAllowedAreas(dimension.dataset.blob['municipality_type'])
+            municipalities = self._get_allowed_municipalities(
+                dimension.dataset.blob['municipality_type']
+            )
 
-            for a_id, a_name in areas:
-                yield DimensionValue(a_id,
+            for m_id, m_name in municipalities:
+                yield DimensionValue(m_id,
                                     dimension,
-                                    label=a_name)
-        elif dimension.id == 'area_group':
-            areas = self._getAllowedAreaGroups(dimension.dataset.blob['municipality_type'])
+                                    label=m_name)
+        elif dimension.id == 'municipality_groups':
+            municipality_groups = self._get_allowed_municipality_groups(
+                dimension.dataset.blob['municipality_type']
+            )
 
-            for a_id, a_name in areas:
-                yield DimensionValue(a_id,
+            for m_id, m_name in municipality_groups:
+                yield DimensionValue(m_id,
                                     dimension,
-                                    label=a_name)
+                                    label=m_name)
 
 
 
@@ -96,8 +100,8 @@ class KoladaScraper(BaseScraper):
     def _fetch_data(self, dataset, query):
         """Make query for actual data.
         Get all regions and years by default.
-        `period` (year) and `municipality` are the only implemented queryable
-        dimensions.
+        `period` (year), `municipality` and `municipality_groups` are the only 
+        implemented queryable dimensions.
 
         :param query: a dict with dimensions and values to query by.
             Examples:
@@ -105,12 +109,12 @@ class KoladaScraper(BaseScraper):
             {"period": 2016 }
         """
         
-        # Make query a dict if isn't
+        # Make query a dict if it already isn't
         if isinstance(query, dict) == False:
             query = {}
 
         # If nothing is set, default to all allowed municipalities
-        queryable_dims = ['municipality', 'period', 'area_group']
+        queryable_dims = ['municipality', 'period', 'municipality_groups']
         if all([x not in query for x in queryable_dims]):
             query['municipality'] = []
             for x in dataset.dimensions['municipality'].allowed_values:
@@ -128,7 +132,7 @@ class KoladaScraper(BaseScraper):
             if dim not in queryable_dims:
                 raise Exception("You cannot query on dimension '{}'".format(dim))
             # Check if the values are allowed
-            if dim in ('municipality', 'area_group'):
+            if dim in ('municipality', 'municipality_groups'):
                 allowed = [x.value for x in dataset.dimensions[dim].allowed_values]
                 for dimVal in query[dim]:
                     if dimVal not in allowed:
@@ -137,12 +141,12 @@ class KoladaScraper(BaseScraper):
         # base url for query
         next_url = '{}data/kpi/{}'.format(self.base_url, dataset.id)
 
-        # Merge `municipality` and `area_group`
+        # Merge `municipality` and `municipality_groups`
         municipalities = []
         if 'municipality' in query:
             municipalities = municipalities + query['municipality']
-        if 'area_group' in query:
-            municipalities = municipalities + query['area_group']
+        if 'municipality_groups' in query:
+            municipalities = municipalities + query['municipality_groups']
 
         if len(municipalities) > 0:
             next_url += '/municipality/{}'.format(','.join(municipalities))
