@@ -29,15 +29,19 @@ class KoladaScraper(BaseScraper):
 
     def _fetch_allowed_values(self, dimension):
         """Yield the allowed values for <dimension>."""
-        if dimension.dataset.blob['municipality_type'] == 'K':
+        if dimension.dataset.blob['municipality_type'] in ('K', 'L'):
             data = requests.get(self.base_url + '/municipality').json()
-            towns = [(row['id'], row['title']) for row in data['values']]
-            for town_id, town_name in towns:
-                yield DimensionValue(town_id,
-                                    dimension,
-                                    label=town_name)
+            regions = []
+            for row in data['values']:
+                if row['type'] == dimension.dataset.blob['municipality_type']:
+                    regions.append((row['id'], row['title']))
 
-    def _fetch_data(self, dataset, query={}):
+            for r_id, r_name in regions:
+                yield DimensionValue(r_id,
+                                    dimension,
+                                    label=r_name)
+
+    def _fetch_data(self, dataset, query):
         """Make query for actual data.
         Get all regions and years by default.
         `period` (year) and `municipality` are the only implemented queryable
@@ -48,10 +52,14 @@ class KoladaScraper(BaseScraper):
             {"municipality": ["0180"]}
             {"period": 2016 }
         """
+        
+        if type(query) is not dict:
+            query = {}
+        
         #
         if "municipality" not in query and "period" not in query:
             query = {
-                "municipality": [x.id for x in self.dimension["municipality"].allowed_values]
+                "municipality": [x.value for x in dataset.dimensions["municipality"].allowed_values]
             }
 
         # Listify queried values (to allow single values in query, like {"year": 2016})
