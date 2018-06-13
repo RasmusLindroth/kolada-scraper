@@ -27,10 +27,18 @@ Example usage
     'municipality': towns[:5],
   })
 
-  # ... or by both
+  # ...or by area_group
+  areas = [x.value for x in dataset.dimensions['area_group'].allowed_values]
+  data = dataset.fetch({
+    'area_group': areas[:5],
+  })
+
+
+  # ... or by all three
   data = dataset.fetch({
     'period': [2016, 2015],
     'municipality': towns[:5],
+    'area_group': areas[:5],
   })
 
   # And then do something with the results.
